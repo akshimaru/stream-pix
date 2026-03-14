@@ -14,7 +14,7 @@ COPY apps/web/package.json apps/web/package.json
 COPY apps/worker/package.json apps/worker/package.json
 COPY packages/shared/package.json packages/shared/package.json
 
-RUN npm ci --ignore-scripts
+RUN npm ci --ignore-scripts --include=dev
 
 COPY . .
 
