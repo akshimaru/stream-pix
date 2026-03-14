@@ -6,6 +6,8 @@ This project is ready to run on Easypanel with managed MySQL, managed Redis, and
 - `streampix-web`
 - `streampix-worker`
 
+There is also a root [Dockerfile](C:/Users/Vibratho/Documents/xtreme-pix/Dockerfile) for Easypanel projects that expect a default Dockerfile in the repository root. It starts the web app by default and can be reused with command override when needed.
+
 ## Recommended service layout
 
 ### 1. MySQL service
@@ -58,7 +60,7 @@ DATABASE_READY_DELAY_SECONDS=5
 ## 4. Web app service
 
 - Source: this Git repository
-- Dockerfile path: `Dockerfile.web`
+- Dockerfile path: `Dockerfile` or `Dockerfile.web`
 - Internal port: `3000`
 - Health check path: `/`
 - Public domain example: `https://app.yourdomain.com`
@@ -97,6 +99,8 @@ REDIS_ENABLED=true
 
 ## Notes
 
+- If Easypanel tries to build `/code/Dockerfile` automatically, the root Dockerfile now supports that flow.
+- The root Dockerfile boots the web app by default. For API and worker, prefer the dedicated Dockerfiles.
 - The API container now runs Prisma migrations automatically on boot.
 - Leave `RUN_SEED_ON_BOOT=false` in production after the first setup.
 - For the first production boot, you may turn `RUN_SEED_ON_BOOT=true`, deploy once, then set it back to `false`.

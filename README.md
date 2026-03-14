@@ -114,6 +114,7 @@ The repository is prepared to run on Easypanel with separate `api`, `web`, and `
 Production guide:
 
 - `deploy/easypanel/README.md`
+- Root fallback Dockerfile for Easypanel default builds: `Dockerfile`
 
 ## Database
 
