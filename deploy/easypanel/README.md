@@ -73,6 +73,12 @@ PORT=3000
 NEXT_PUBLIC_API_URL=https://api.yourdomain.com
 ```
 
+Important:
+
+- `NEXT_PUBLIC_API_URL` is baked into the Next.js build.
+- Do not keep `http://localhost:4000` in Easypanel production builds.
+- Use the public API domain, for example `https://api.yourdomain.com`.
+
 ## 5. Worker app service
 
 - Source: this Git repository
@@ -101,6 +107,7 @@ REDIS_ENABLED=true
 
 - If Easypanel tries to build `/code/Dockerfile` automatically, the root Dockerfile now supports that flow.
 - The root Dockerfile boots the web app by default. For API and worker, prefer the dedicated Dockerfiles.
+- The Dockerfiles install dependencies with `npm ci --ignore-scripts` and only run Prisma and build steps after the full source code is copied.
 - The API container now runs Prisma migrations automatically on boot.
 - Leave `RUN_SEED_ON_BOOT=false` in production after the first setup.
 - For the first production boot, you may turn `RUN_SEED_ON_BOOT=true`, deploy once, then set it back to `false`.

@@ -4,13 +4,17 @@ WORKDIR /app
 
 RUN apk add --no-cache openssl
 
+ENV NODE_ENV=production
+ARG NEXT_PUBLIC_API_URL=http://localhost:4000
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY apps/server/package.json apps/server/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY apps/worker/package.json apps/worker/package.json
 COPY packages/shared/package.json packages/shared/package.json
 
-RUN npm ci
+RUN npm ci --ignore-scripts
 
 COPY . .
 
