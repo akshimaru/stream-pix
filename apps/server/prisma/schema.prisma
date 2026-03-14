@@ -1,0 +1,804 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum StreamerStatus {
+  ACTIVE
+  SUSPENDED
+  BLOCKED
+}
+
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  EXPIRED
+}
+
+enum PaymentProviderType {
+  PIX
+}
+
+enum PixChargeStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELED
+  EXPIRED
+  REFUNDED
+  BLOCKED
+}
+
+enum PixTransactionStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELED
+  REFUNDED
+}
+
+enum AlertStatus {
+  QUEUED
+  PROCESSING
+  DISPLAYED
+  SPOKEN
+  FAILED
+  BLOCKED
+  APPROVED
+  REJECTED
+}
+
+enum TtsJobStatus {
+  QUEUED
+  PROCESSING
+  SPOKEN
+  FAILED
+  SKIPPED
+  MUTED
+}
+
+enum WebhookStatus {
+  RECEIVED
+  PROCESSED
+  FAILED
+  IGNORED
+}
+
+enum InvoiceStatus {
+  PENDING
+  PAID
+  VOID
+  OVERDUE
+}
+
+enum OverlayThemePreset {
+  NEON
+  MINIMAL
+  GLITCH
+}
+
+enum OverlayPosition {
+  TOP_LEFT
+  TOP_RIGHT
+  BOTTOM_LEFT
+  BOTTOM_RIGHT
+  CENTER
+}
+
+enum PayoutStatus {
+  PENDING_APPROVAL
+  PROCESSING
+  PAID
+  REJECTED
+  FAILED
+  CANCELED
+}
+
+enum PayoutKeyType {
+  CPF
+  CNPJ
+  EMAIL
+  PHONE
+  EVP
+}
+
+enum LedgerEntryType {
+  PIX_CREDIT
+  PAYOUT_REQUEST
+  PAYOUT_COMPLETED
+  PAYOUT_REJECTED
+  MANUAL_ADJUSTMENT
+}
+
+enum LedgerEntryDirection {
+  CREDIT
+  DEBIT
+}
+
+enum ModerationLevel {
+  OFF
+  BASIC
+  STRICT
+}
+
+enum TeamMemberRole {
+  MANAGER
+  MODERATOR
+  ANALYST
+}
+
+enum TeamMemberStatus {
+  INVITED
+  ACTIVE
+  DISABLED
+}
+
+model User {
+  id                String               @id @default(cuid()) @db.VarChar(191)
+  name              String               @db.VarChar(120)
+  email             String               @unique @db.VarChar(191)
+  passwordHash      String               @db.VarChar(255)
+  avatarUrl         String?              @db.VarChar(500)
+  emailVerifiedAt   DateTime?
+  isActive          Boolean              @default(true)
+  lastLoginAt       DateTime?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  deletedAt         DateTime?
+  roles             UserRole[]
+  streamerProfile   StreamerProfile?
+  refreshTokens     RefreshToken[]
+  passwordResets    PasswordResetToken[]
+  auditLogs         AuditLog[]
+  notificationsRead Notification[]       @relation("NotificationReadBy")
+  teamMemberships   TeamMember[]         @relation("TeamMemberUser")
+  reviewedPayouts   PayoutRequest[]      @relation("PayoutReviewedBy")
+
+  @@index([isActive])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+model Role {
+  id          String     @id @default(cuid()) @db.VarChar(191)
+  code        String     @unique @db.VarChar(64)
+  name        String     @db.VarChar(120)
+  description String?    @db.VarChar(255)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  users       UserRole[]
+
+  @@map("roles")
+}
+
+model UserRole {
+  userId     String   @db.VarChar(191)
+  roleId     String   @db.VarChar(191)
+  assignedAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+model StreamerProfile {
+  id                 String               @id @default(cuid()) @db.VarChar(191)
+  userId             String               @unique @db.VarChar(191)
+  workspaceName      String               @db.VarChar(120)
+  displayName        String               @db.VarChar(120)
+  slug               String               @unique @db.VarChar(64)
+  bio                String?              @db.Text
+  avatarUrl          String?              @db.VarChar(500)
+  bannerUrl          String?              @db.VarChar(500)
+  logoUrl            String?              @db.VarChar(500)
+  status             StreamerStatus       @default(ACTIVE)
+  publicPageEnabled  Boolean              @default(true)
+  defaultCurrency    String               @default("BRL") @db.VarChar(8)
+  overlayToken       String               @unique @db.VarChar(191)
+  publicApiToken     String               @unique @db.VarChar(191)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  deletedAt          DateTime?
+  user               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscriptions      Subscription[]
+  pixCharges         PixCharge[]
+  pixTransactions    PixTransaction[]
+  alerts             Alert[]
+  ttsJobs            TtsJob[]
+  overlaySettings    OverlaySettings?
+  publicPageSettings PublicPageSettings?
+  streamerSettings   StreamerSettings?
+  usageMetrics       UsageMetric[]
+  auditLogs          AuditLog[]
+  webhookEvents      WebhookEvent[]
+  invoices           Invoice[]
+  notifications      Notification[]
+  apiKeys            ApiKey[]
+  teamMembers        TeamMember[]
+  payoutAccount      StreamerPayoutAccount?
+  payoutRequests     PayoutRequest[]
+  balanceLedger      BalanceLedgerEntry[]
+
+  @@index([status])
+  @@index([deletedAt])
+  @@map("streamer_profiles")
+}
+
+model Plan {
+  id                    String          @id @default(cuid()) @db.VarChar(191)
+  code                  String          @unique @db.VarChar(64)
+  name                  String          @db.VarChar(120)
+  description           String?         @db.VarChar(255)
+  monthlyPrice          Decimal         @db.Decimal(10, 2)
+  yearlyPrice           Decimal         @db.Decimal(10, 2)
+  feePercentage         Decimal         @db.Decimal(5, 2)
+  fixedFee              Decimal         @db.Decimal(10, 2)
+  messageLimit          Int?
+  ttsLimit              Int?
+  messageCharLimit      Int             @default(180)
+  hasPremiumVoices      Boolean         @default(false)
+  hasAdvancedAnalytics  Boolean         @default(false)
+  removeBranding        Boolean         @default(false)
+  hasAdvancedModeration Boolean         @default(false)
+  highlight             Boolean         @default(false)
+  active                Boolean         @default(true)
+  features              Json
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  deletedAt             DateTime?
+  subscriptions         Subscription[]
+
+  @@index([active])
+  @@index([deletedAt])
+  @@map("plans")
+}
+
+model Subscription {
+  id                  String             @id @default(cuid()) @db.VarChar(191)
+  streamerId          String             @db.VarChar(191)
+  planId              String             @db.VarChar(191)
+  status              SubscriptionStatus @default(TRIALING)
+  billingCycle        BillingCycle       @default(MONTHLY)
+  startedAt           DateTime
+  currentPeriodStart  DateTime
+  currentPeriodEnd    DateTime
+  canceledAt          DateTime?
+  trialEndsAt         DateTime?
+  monthlyMessageCount Int                @default(0)
+  monthlyTtsCount     Int                @default(0)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  deletedAt           DateTime?
+  streamer            StreamerProfile    @relation(fields: [streamerId], references: [id], onDelete: Cascade)
+  plan                Plan               @relation(fields: [planId], references: [id], onDelete: Restrict)
+  invoices            Invoice[]
+
+  @@index([streamerId, status])
+  @@index([planId])
+  @@index([currentPeriodEnd])
+  @@index([deletedAt])
+  @@map("subscriptions")
+}
+
+model PaymentProvider {
+  id              String              @id @default(cuid()) @db.VarChar(191)
+  code            String              @unique @db.VarChar(64)
+  name            String              @db.VarChar(120)
+  driver          String              @db.VarChar(120)
+  type            PaymentProviderType @default(PIX)
+  isActive        Boolean             @default(true)
+  isDefault       Boolean             @default(false)
+  feePercentage   Decimal             @db.Decimal(5, 2)
+  fixedFee        Decimal             @db.Decimal(10, 2)
+  config          Json
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  pixCharges      PixCharge[]
+  pixTransactions PixTransaction[]
+  webhookEvents   WebhookEvent[]
+
+  @@index([isActive])
+  @@index([isDefault])
+  @@map("payment_providers")
+}
+
+model TtsProvider {
+  id        String   @id @default(cuid()) @db.VarChar(191)
+  code      String   @unique @db.VarChar(64)
+  name      String   @db.VarChar(120)
+  driver    String   @db.VarChar(120)
+  isActive  Boolean  @default(true)
+  isDefault Boolean  @default(false)
+  config    Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ttsJobs   TtsJob[]
+
+  @@index([isActive])
+  @@index([isDefault])
+  @@map("tts_providers")
+}
+
+model PixCharge {
+  id                String          @id @default(cuid()) @db.VarChar(191)
+  streamerId        String          @db.VarChar(191)
+  paymentProviderId String          @db.VarChar(191)
+  viewerName        String          @db.VarChar(80)
+  viewerEmail       String?         @db.VarChar(191)
+  viewerMessage     String          @db.Text
+  sanitizedMessage  String          @db.Text
+  amount            Decimal         @db.Decimal(10, 2)
+  netAmount         Decimal?        @db.Decimal(10, 2)
+  platformFee       Decimal?        @db.Decimal(10, 2)
+  gatewayFee        Decimal?        @db.Decimal(10, 2)
+  pixCopyPaste      String          @db.Text
+  qrCodeDataUrl     String?         @db.LongText
+  txid              String          @unique @db.VarChar(191)
+  externalId        String?         @unique @db.VarChar(191)
+  payerDocument     String?         @db.VarChar(32)
+  isAnonymous       Boolean         @default(false)
+  shouldReadMessage Boolean         @default(true)
+  isTest            Boolean         @default(false)
+  status            PixChargeStatus @default(PENDING)
+  statusReason      String?         @db.VarChar(255)
+  confirmedAt       DateTime?
+  expiresAt         DateTime
+  idempotencyKey    String?         @unique @db.VarChar(191)
+  metadata          Json?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  deletedAt         DateTime?
+  streamer          StreamerProfile @relation(fields: [streamerId], references: [id], onDelete: Cascade)
+  paymentProvider   PaymentProvider @relation(fields: [paymentProviderId], references: [id], onDelete: Restrict)
+  transactions      PixTransaction[]
+  alert             Alert?
+  webhookEvents     WebhookEvent[]
+  ledgerEntries     BalanceLedgerEntry[]
+
+  @@index([streamerId, status, createdAt])
+  @@index([paymentProviderId, status])
+  @@index([expiresAt])
+  @@index([confirmedAt])
+  @@index([deletedAt])
+  @@map("pix_charges")
+}
+
+model PixTransaction {
+  id                String               @id @default(cuid()) @db.VarChar(191)
+  chargeId          String               @db.VarChar(191)
+  streamerId        String               @db.VarChar(191)
+  paymentProviderId String               @db.VarChar(191)
+  externalId        String?              @unique @db.VarChar(191)
+  status            PixTransactionStatus @default(PENDING)
+  grossAmount       Decimal              @db.Decimal(10, 2)
+  netAmount         Decimal              @db.Decimal(10, 2)
+  platformFee       Decimal              @db.Decimal(10, 2)
+  gatewayFee        Decimal              @db.Decimal(10, 2)
+  paidAt            DateTime?
+  settlementAt      DateTime?
+  rawPayload        Json?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  charge            PixCharge            @relation(fields: [chargeId], references: [id], onDelete: Cascade)
+  streamer          StreamerProfile      @relation(fields: [streamerId], references: [id], onDelete: Cascade)
+  paymentProvider   PaymentProvider      @relation(fields: [paymentProviderId], references: [id], onDelete: Restrict)
+
+  @@index([chargeId])
+  @@index([streamerId, status, createdAt])
+  @@index([paidAt])
+  @@map("pix_transactions")
+}
+
+model Alert {
+  id               String          @id @default(cuid()) @db.VarChar(191)
+  streamerId       String          @db.VarChar(191)
+  chargeId         String          @unique @db.VarChar(191)
+  status           AlertStatus     @default(QUEUED)
+  title            String          @db.VarChar(120)
+  supporterName    String          @db.VarChar(80)
+  message          String          @db.Text
+  sanitizedMessage String          @db.Text
+  amount           Decimal         @db.Decimal(10, 2)
+  showAmount       Boolean         @default(true)
+  showName         Boolean         @default(true)
+  ttsRequested     Boolean         @default(true)
+  ttsExecuted      Boolean         @default(false)
+  deliveredAt      DateTime?
+  displayedAt      DateTime?
+  durationMs       Int             @default(6500)
+  themeSnapshot    Json
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  streamer         StreamerProfile @relation(fields: [streamerId], references: [id], onDelete: Cascade)
+  charge           PixCharge       @relation(fields: [chargeId], references: [id], onDelete: Cascade)
+  ttsJob           TtsJob?
+
+  @@index([streamerId, status, createdAt])
+  @@index([displayedAt])
+  @@map("alerts")
+}
+
+model TtsJob {
+  id            String          @id @default(cuid()) @db.VarChar(191)
+  streamerId    String          @db.VarChar(191)
+  alertId       String?         @unique @db.VarChar(191)
+  ttsProviderId String?         @db.VarChar(191)
+  status        TtsJobStatus    @default(QUEUED)
+  inputText     String          @db.Text
+  sanitizedText String          @db.Text
+  voiceName     String          @db.VarChar(120)
+  language      String          @db.VarChar(16)
+  speed         Decimal         @db.Decimal(5, 2)
+  pitch         Decimal?        @db.Decimal(5, 2)
+  volume        Decimal         @db.Decimal(5, 2)
+  attempts      Int             @default(0)
+  maxAttempts   Int             @default(3)
+  errorMessage  String?         @db.VarChar(255)
+  audioUrl      String?         @db.VarChar(500)
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  streamer      StreamerProfile @relation(fields: [streamerId], references: [id], onDelete: Cascade)
+  alert         Alert?          @relation(fields: [alertId], references: [id], onDelete: SetNull)
+  ttsProvider   TtsProvider?    @relation(fields: [ttsProviderId], references: [id], onDelete: SetNull)
+
+  @@index([streamerId, status, createdAt])
+  @@index([ttsProviderId])
+  @@map("tts_jobs")
+}
+
+model OverlaySettings {
+  id                 String             @id @default(cuid()) @db.VarChar(191)
+  streamerId         String             @unique @db.VarChar(191)
+  themePreset        OverlayThemePreset @default(NEON)
+  alertSound         String             @default("CHIME") @db.VarChar(32)
+  primaryColor       String             @db.VarChar(32)
+  secondaryColor     String             @db.VarChar(32)
+  accentColor        String             @db.VarChar(32)
+  fontFamily         String             @db.VarChar(120)
+  cardStyle          String             @default("glass") @db.VarChar(40)
+  logoUrl            String?            @db.VarChar(500)
+  backgroundImageUrl String?            @db.VarChar(500)
+  borderRadius       Int                @default(24)
+  glowIntensity      Int                @default(80)
+  cardWidth          Int                @default(420)
+  position           OverlayPosition    @default(BOTTOM_RIGHT)
+  transparency       Int                @default(14)
+  animationIn        String             @default("slide-up") @db.VarChar(40)
+  animationOut       String             @default("fade-out") @db.VarChar(40)
+  durationMs         Int                @default(6500)
+  showAmount         Boolean            @default(true)
+  showName           Boolean            @default(true)
+  showAvatar         Boolean            @default(false)
+  volume             Int                @default(88)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  streamer           StreamerProfile    @relation(fields: [streamerId], references: [id], onDelete: Cascade)
+
+  @@map("overlay_settings")
+}
+
+model StreamerPayoutAccount {
+  id               String               @id @default(cuid()) @db.VarChar(191)
+  streamerId        String               @unique @db.VarChar(191)
+  legalName         String?              @db.VarChar(160)
+  document          String?              @db.VarChar(32)
+  pixKeyType        PayoutKeyType?
+  pixKeyValue       String?              @db.VarChar(191)
+  payoutsEnabled    Boolean              @default(false)
+  instantPayoutEnabled Boolean           @default(true)
+  withdrawalPinHash  String?             @db.VarChar(255)
+  withdrawalPinUpdatedAt DateTime?
+  availableBalance  Decimal              @default(0) @db.Decimal(12, 2)
+  pendingBalance    Decimal              @default(0) @db.Decimal(12, 2)
+  lockedBalance     Decimal              @default(0) @db.Decimal(12, 2)
+  totalPaidOut      Decimal              @default(0) @db.Decimal(12, 2)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  streamer          StreamerProfile      @relation(fields: [streamerId], references: [id], onDelete: Cascade)
+  payoutRequests    PayoutRequest[]
+  ledgerEntries     BalanceLedgerEntry[]
+
+  @@index([payoutsEnabled])
+  @@map("streamer_payout_accounts")
+}
+
+model BalanceLedgerEntry {
+  id               String               @id @default(cuid()) @db.VarChar(191)
+  streamerId       String               @db.VarChar(191)
+  payoutAccountId  String               @db.VarChar(191)
+  chargeId         String?              @db.VarChar(191)
+  payoutRequestId  String?              @db.VarChar(191)
+  entryType        LedgerEntryType
+  direction        LedgerEntryDirection
+  grossAmount      Decimal?             @db.Decimal(12, 2)
+  feeAmount        Decimal?             @db.Decimal(12, 2)
+  amount           Decimal              @db.Decimal(12, 2)
+  balanceAfter     Decimal              @db.Decimal(12, 2)
+  description      String               @db.VarChar(255)
+  metadata         Json?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  streamer         StreamerProfile      @relation(fields: [streamerId], references: [id], onDelete: Cascade)
+  payoutAccount    StreamerPayoutAccount @relation(fields: [payoutAccountId], references: [id], onDelete: Cascade)
+  charge           PixCharge?           @relation(fields: [chargeId], references: [id], onDelete: SetNull)
+  payoutRequest    PayoutRequest?       @relation(fields: [payoutRequestId], references: [id], onDelete: SetNull)
+
+  @@index([streamerId, createdAt])
+  @@index([payoutAccountId, createdAt])
+  @@index([chargeId])
+  @@index([payoutRequestId])
+  @@map("balance_ledger_entries")
+}
+
+model PayoutRequest {
+  id               String               @id @default(cuid()) @db.VarChar(191)
+  streamerId       String               @db.VarChar(191)
+  payoutAccountId  String               @db.VarChar(191)
+  reviewedByUserId String?              @db.VarChar(191)
+  providerCode     String               @default("MOCK_PAYOUT") @db.VarChar(64)
+  externalId       String?              @unique @db.VarChar(191)
+  amount           Decimal              @db.Decimal(12, 2)
+  feeAmount        Decimal              @default(0) @db.Decimal(12, 2)
+  netAmount        Decimal              @db.Decimal(12, 2)
+  status           PayoutStatus         @default(PENDING_APPROVAL)
+  failureReason    String?              @db.VarChar(255)
+  requestedAt      DateTime             @default(now())
+  reviewedAt       DateTime?
+  paidAt           DateTime?
+  idempotencyKey   String?              @unique @db.VarChar(191)
+  metadata         Json?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  streamer         StreamerProfile      @relation(fields: [streamerId], references: [id], onDelete: Cascade)
+  payoutAccount    StreamerPayoutAccount @relation(fields: [payoutAccountId], references: [id], onDelete: Cascade)
+  reviewedBy       User?                @relation("PayoutReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  ledgerEntries    BalanceLedgerEntry[]
+
+  @@index([streamerId, status, createdAt])
+  @@index([payoutAccountId, status])
+  @@index([requestedAt])
+  @@map("payout_requests")
+}
+
+model PublicPageSettings {
+  id                 String          @id @default(cuid()) @db.VarChar(191)
+  streamerId         String          @unique @db.VarChar(191)
+  headline           String          @db.VarChar(140)
+  description        String          @db.Text
+  minimumAmount      Decimal         @db.Decimal(10, 2)
+  maximumAmount      Decimal         @db.Decimal(10, 2)
+  minAmountForTts    Decimal         @db.Decimal(10, 2)
+  messageCharLimit   Int             @default(180)
+  allowVoiceMessages Boolean         @default(true)
+  allowLinks         Boolean         @default(false)
+  blockedWords       Json
+  cooldownSeconds    Int             @default(12)
+  autoModeration     Boolean         @default(true)
+  manualModeration   Boolean         @default(false)
+  primaryColor       String          @default("#7c3aed") @db.VarChar(32)
+  secondaryColor     String          @default("#06b6d4") @db.VarChar(32)
+  accentColor        String          @default("#f472b6") @db.VarChar(32)
+  backgroundPreset   String          @default("aurora-grid") @db.VarChar(64)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  streamer           StreamerProfile @relation(fields: [streamerId], references: [id], onDelete: Cascade)
+
+  @@map("public_page_settings")
+}
+
+model StreamerSettings {
+  id                    String          @id @default(cuid()) @db.VarChar(191)
+  streamerId            String          @unique @db.VarChar(191)
+  locale                String          @default("pt-BR") @db.VarChar(16)
+  timezone              String          @default("America/Sao_Paulo") @db.VarChar(64)
+  defaultVoice          String          @default("Neon Pulse") @db.VarChar(120)
+  voiceLanguage         String          @default("pt-BR") @db.VarChar(16)
+  voiceSpeed            Decimal         @db.Decimal(5, 2)
+  voicePitch            Decimal         @db.Decimal(5, 2)
+  voiceVolume           Int             @default(90)
+  minAmountForTts       Decimal         @db.Decimal(10, 2)
+  maxMessageLength      Int             @default(180)
+  fallbackMessage       String?         @db.VarChar(255)
+  moderationLevel       ModerationLevel @default(BASIC)
+  alertsEnabled         Boolean         @default(true)
+  overlayEnabled        Boolean         @default(true)
+  notifyOnPayment       Boolean         @default(true)
+  featureFlags          Json
+  onboardingCompletedAt DateTime?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  streamer              StreamerProfile @relation(fields: [streamerId], references: [id], onDelete: Cascade)
+
+  @@map("streamer_settings")
+}
+
+model SuperadminSetting {
+  id          String   @id @default(cuid()) @db.VarChar(191)
+  key         String   @unique @db.VarChar(120)
+  value       Json
+  description String?  @db.VarChar(255)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("superadmin_settings")
+}
+
+model AuditLog {
+  id          String           @id @default(cuid()) @db.VarChar(191)
+  actorUserId String?          @db.VarChar(191)
+  streamerId  String?          @db.VarChar(191)
+  entityType  String           @db.VarChar(80)
+  entityId    String           @db.VarChar(191)
+  action      String           @db.VarChar(120)
+  metadata    Json?
+  ipAddress   String?          @db.VarChar(64)
+  userAgent   String?          @db.VarChar(255)
+  createdAt   DateTime         @default(now())
+  actor       User?            @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  streamer    StreamerProfile? @relation(fields: [streamerId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId])
+  @@index([streamerId, createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
+
+model WebhookEvent {
+  id                String           @id @default(cuid()) @db.VarChar(191)
+  streamerId        String?          @db.VarChar(191)
+  paymentProviderId String?          @db.VarChar(191)
+  chargeId          String?          @db.VarChar(191)
+  source            String           @db.VarChar(120)
+  eventType         String           @db.VarChar(120)
+  idempotencyKey    String           @unique @db.VarChar(191)
+  status            WebhookStatus    @default(RECEIVED)
+  payload           Json
+  processedAt       DateTime?
+  errorMessage      String?          @db.VarChar(255)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  streamer          StreamerProfile? @relation(fields: [streamerId], references: [id], onDelete: SetNull)
+  paymentProvider   PaymentProvider? @relation(fields: [paymentProviderId], references: [id], onDelete: SetNull)
+  charge            PixCharge?       @relation(fields: [chargeId], references: [id], onDelete: SetNull)
+
+  @@index([streamerId, createdAt])
+  @@index([paymentProviderId, status])
+  @@index([chargeId])
+  @@map("webhook_events")
+}
+
+model Invoice {
+  id             String          @id @default(cuid()) @db.VarChar(191)
+  streamerId     String          @db.VarChar(191)
+  subscriptionId String          @db.VarChar(191)
+  number         String          @unique @db.VarChar(64)
+  status         InvoiceStatus   @default(PENDING)
+  amount         Decimal         @db.Decimal(10, 2)
+  dueDate        DateTime
+  paidAt         DateTime?
+  metadata       Json?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  streamer       StreamerProfile @relation(fields: [streamerId], references: [id], onDelete: Cascade)
+  subscription   Subscription    @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([streamerId, status])
+  @@index([dueDate])
+  @@map("invoices")
+}
+
+model UsageMetric {
+  id             String          @id @default(cuid()) @db.VarChar(191)
+  streamerId     String          @db.VarChar(191)
+  periodStart    DateTime
+  periodEnd      DateTime
+  messagesCount  Int             @default(0)
+  ttsCount       Int             @default(0)
+  chargesCount   Int             @default(0)
+  grossAmount    Decimal         @db.Decimal(12, 2)
+  netAmount      Decimal         @db.Decimal(12, 2)
+  platformRevenue Decimal        @db.Decimal(12, 2)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  streamer       StreamerProfile @relation(fields: [streamerId], references: [id], onDelete: Cascade)
+
+  @@unique([streamerId, periodStart, periodEnd])
+  @@index([streamerId, periodStart])
+  @@map("usage_metrics")
+}
+
+model Notification {
+  id           String          @id @default(cuid()) @db.VarChar(191)
+  streamerId   String          @db.VarChar(191)
+  type         String          @db.VarChar(80)
+  title        String          @db.VarChar(120)
+  message      String          @db.VarChar(255)
+  metadata     Json?
+  readAt       DateTime?
+  readByUserId String?         @db.VarChar(191)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  streamer     StreamerProfile @relation(fields: [streamerId], references: [id], onDelete: Cascade)
+  readByUser   User?           @relation("NotificationReadBy", fields: [readByUserId], references: [id], onDelete: SetNull)
+
+  @@index([streamerId, createdAt])
+  @@index([readAt])
+  @@map("notifications")
+}
+
+model ApiKey {
+  id         String          @id @default(cuid()) @db.VarChar(191)
+  streamerId String          @db.VarChar(191)
+  name       String          @db.VarChar(120)
+  keyHash    String          @db.VarChar(255)
+  scopes     Json
+  lastUsedAt DateTime?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  streamer   StreamerProfile @relation(fields: [streamerId], references: [id], onDelete: Cascade)
+
+  @@index([streamerId, createdAt])
+  @@map("api_keys")
+}
+
+model TeamMember {
+  id         String           @id @default(cuid()) @db.VarChar(191)
+  streamerId String           @db.VarChar(191)
+  userId     String?          @db.VarChar(191)
+  email      String           @db.VarChar(191)
+  role       TeamMemberRole
+  status     TeamMemberStatus @default(INVITED)
+  invitedAt  DateTime         @default(now())
+  acceptedAt DateTime?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  streamer   StreamerProfile  @relation(fields: [streamerId], references: [id], onDelete: Cascade)
+  user       User?            @relation("TeamMemberUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([streamerId, status])
+  @@index([email])
+  @@map("team_members")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid()) @db.VarChar(191)
+  userId    String   @db.VarChar(191)
+  token     String   @unique @db.VarChar(191)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid()) @db.VarChar(191)
+  userId    String   @db.VarChar(191)
+  tokenHash String   @unique @db.VarChar(255)
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@index([revokedAt])
+  @@map("refresh_tokens")
+}

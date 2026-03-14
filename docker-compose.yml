@@ -1,0 +1,83 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: streampix-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: streampix
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  redis:
+    image: redis:7-alpine
+    container_name: streampix-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    container_name: streampix-server
+    restart: unless-stopped
+    depends_on:
+      - mysql
+      - redis
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      WEB_ORIGIN: http://localhost:3000
+      SERVER_URL: http://localhost:4000
+      DATABASE_URL: mysql://root:root@mysql:3306/streampix
+      REDIS_URL: redis://redis:6379
+      REDIS_ENABLED: "true"
+      JWT_ACCESS_SECRET: streampix-access-secret-docker
+      JWT_REFRESH_SECRET: streampix-refresh-secret-docker
+      JWT_SOCKET_SECRET: streampix-socket-secret-docker
+      ACCESS_COOKIE_NAME: streampix_access_token
+      REFRESH_COOKIE_NAME: streampix_refresh_token
+      COOKIE_SECURE: "false"
+      RUN_MIGRATIONS_ON_BOOT: "true"
+      RUN_SEED_ON_BOOT: "true"
+      DATABASE_READY_RETRIES: "20"
+      DATABASE_READY_DELAY_SECONDS: "5"
+    ports:
+      - "4000:4000"
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: streampix-worker
+    restart: unless-stopped
+    depends_on:
+      - mysql
+      - redis
+      - server
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: mysql://root:root@mysql:3306/streampix
+      REDIS_URL: redis://redis:6379
+      REDIS_ENABLED: "true"
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: streampix-web
+    restart: unless-stopped
+    depends_on:
+      - server
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+    ports:
+      - "3000:3000"
+
+volumes:
+  mysql_data:

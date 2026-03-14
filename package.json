@@ -1,0 +1,35 @@
+{
+  "name": "streampix",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "npm@11.9.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "postinstall": "npm run build --workspace @streampix/shared && npm run prisma:generate --workspace @streampix/server",
+    "predev": "npm run build --workspace @streampix/shared",
+    "dev": "concurrently \"npm run dev --workspace @streampix/server\" \"npm run dev --workspace @streampix/worker\" \"npm run dev --workspace @streampix/web\"",
+    "dev:web": "npm run dev --workspace @streampix/web",
+    "dev:server": "npm run dev --workspace @streampix/server",
+    "dev:worker": "npm run dev --workspace @streampix/worker",
+    "prebuild": "npm run build --workspace @streampix/shared",
+    "build": "npm run build --workspace @streampix/server && npm run build --workspace @streampix/worker && npm run build --workspace @streampix/web",
+    "prestart": "npm run build --workspace @streampix/shared",
+    "start": "concurrently \"npm run start --workspace @streampix/server\" \"npm run start --workspace @streampix/web\"",
+    "start:full": "concurrently \"npm run start --workspace @streampix/server\" \"npm run start --workspace @streampix/worker\" \"npm run start --workspace @streampix/web\"",
+    "start:web": "npm run start --workspace @streampix/web",
+    "start:server": "npm run start --workspace @streampix/server",
+    "start:worker": "npm run start --workspace @streampix/worker",
+    "lint": "npm run lint --workspace @streampix/shared && npm run lint --workspace @streampix/server && npm run lint --workspace @streampix/worker && npm run lint --workspace @streampix/web",
+    "typecheck": "npm run lint",
+    "db:generate": "npm run prisma:generate --workspace @streampix/server",
+    "db:migrate": "npm run prisma:migrate --workspace @streampix/server",
+    "db:seed": "npm run prisma:seed --workspace @streampix/server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.8.0"
+  }
+}
