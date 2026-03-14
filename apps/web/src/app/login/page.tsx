@@ -6,11 +6,16 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { loginSchema, type LoginInput } from "@streampix/shared";
-import { apiFetch, apiPost } from "@/lib/api";
+import { apiPost } from "@/lib/api";
 import { useAuthStore } from "@/store/auth-store";
 import { AuthShell } from "@/components/shared/auth-shell";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+
+type AuthResponse = {
+  user: NonNullable<ReturnType<typeof useAuthStore.getState>["user"]>;
+  realtimeToken: string;
+};
 
 export default function LoginPage() {
   const router = useRouter();
@@ -25,11 +30,7 @@ export default function LoginPage() {
 
   async function onSubmit(values: LoginInput) {
     try {
-      await apiPost("/v1/auth/login", values);
-      const session = await apiFetch<{
-        user: NonNullable<ReturnType<typeof useAuthStore.getState>["user"]>;
-        realtimeToken: string;
-      }>("/v1/auth/me");
+      const session = await apiPost<AuthResponse>("/v1/auth/login", values);
       setSession({ user: session.user, realtimeToken: session.realtimeToken });
       toast.success("Login realizado.");
 
@@ -48,14 +49,16 @@ export default function LoginPage() {
       <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
         <label className="space-y-2 text-sm text-white/70">
           E-mail
-          <Input {...form.register("email")} />
+          <Input type="email" autoComplete="email" {...form.register("email")} />
+          {form.formState.errors.email ? <p className="text-xs text-rose-300">{form.formState.errors.email.message}</p> : null}
         </label>
         <label className="space-y-2 text-sm text-white/70">
           Senha
-          <Input type="password" {...form.register("password")} />
+          <Input type="password" autoComplete="current-password" {...form.register("password")} />
+          {form.formState.errors.password ? <p className="text-xs text-rose-300">{form.formState.errors.password.message}</p> : null}
         </label>
-        <Button className="w-full" type="submit">
-          Entrar
+        <Button className="w-full" type="submit" disabled={form.formState.isSubmitting}>
+          {form.formState.isSubmitting ? "Entrando..." : "Entrar"}
         </Button>
       </form>
       <div className="mt-6 flex flex-wrap justify-between gap-3 text-sm text-white/55">
